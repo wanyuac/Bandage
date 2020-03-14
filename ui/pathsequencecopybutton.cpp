@@ -1,9 +1,9 @@
-#include "querypathsequencecopybutton.h"
+#include "pathsequencecopybutton.h"
 
 #include <QApplication>
 #include <QClipboard>
 
-QueryPathSequenceCopyButton::QueryPathSequenceCopyButton(QByteArray pathSequence, QString pathStart) :
+PathSequenceCopyButton::PathSequenceCopyButton(QByteArray pathSequence, QString pathStart) :
     m_pathSequence(pathSequence)
 {
     setText(pathStart);
@@ -11,7 +11,7 @@ QueryPathSequenceCopyButton::QueryPathSequenceCopyButton(QByteArray pathSequence
 }
 
 
-void QueryPathSequenceCopyButton::copySequenceToClipboard()
+void PathSequenceCopyButton::copySequenceToClipboard()
 {
     QClipboard * clipboard = QApplication::clipboard();
     clipboard->setText(m_pathSequence);

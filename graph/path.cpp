@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -25,8 +25,11 @@
 #include "assemblygraph.h"
 #include <QStringList>
 #include <QApplication>
+#include <QHash>
+#include <QSet>
+#include <set>
+#include <utility>
 #include <limits>
-
 
 
 //These will try to produce a path using the given nodes.
@@ -228,6 +231,20 @@ Path Path::makeFromString(QString pathString, bool circular,
 
 
 
+Path Path::makePathToEndOfNode(GraphLocation startLocation)
+{
+    Path path;
+
+    DeBruijnNode * node = startLocation.getNode();
+    path.m_nodes.push_back(node);
+    path.m_startLocation = startLocation;
+    path.m_endLocation = GraphLocation::endOfNode(node);
+
+    return path;
+}
+
+
+
 void Path::buildUnambiguousPathFromNodes(QList<DeBruijnNode *> nodes,
                                          bool strandSpecific)
 {
@@ -404,6 +421,21 @@ bool Path::addNode(DeBruijnNode * newNode, bool strandSpecific, bool makeCircula
 }
 
 
+
+//This function adds a node to the end of the path.  It assumes that the node
+//can in fact be added to the end - it does not check this.
+void Path::addNodeToEndNoCheck(DeBruijnNode * newNode)
+{
+    m_nodes.push_back(newNode);
+    if (m_nodes.size() > 1)
+    {
+        DeBruijnNode * secondToLastNode = m_nodes[m_nodes.size() - 2];
+        m_edges.push_back(secondToLastNode->doesNodeLeadAway(newNode));
+    }
+    m_endLocation = GraphLocation::endOfNode(newNode);
+}
+
+
 //This function looks to see if there are other edges connecting path nodes
 //that aren't in the list of path edges.  If so, it returns true.
 //This is used to check whether a Path is ambiguous or node.
@@ -503,6 +535,9 @@ QByteArray Path::modifySequenceUsingOverlap(QByteArray sequence, int overlap) co
 
 int Path::getLength() const
 {
+    if (m_nodes.empty())
+        return 0;
+
     int length = 0;
     for (int i = 0; i < m_nodes.size(); ++i)
         length += m_nodes[i]->getLength();
@@ -670,7 +705,8 @@ bool Path::canNodeFitAtStart(DeBruijnNode * node, Path * extendedPath) const
 QList<Path> Path::getAllPossiblePaths(GraphLocation startLocation,
                                       GraphLocation endLocation,
                                       int nodeSearchDepth,
-                                      int minDistance, int maxDistance)
+                                      int minDistance, int maxDistance,
+                                      bool trimEnds)
 {
     QList<Path> finishedPaths;
     QList<Path> unfinishedPaths;
@@ -693,10 +729,13 @@ QList<Path> Path::getAllPossiblePaths(GraphLocation startLocation,
         while (j != unfinishedPaths.end())
         {
             DeBruijnNode * lastNode = (*j).m_nodes.back();
-            if (lastNode == endLocation.getNode())
+            if (lastNode == endLocation.getNode() &&
+                    ((*j).m_nodes.size() > 1 || endLocation.getPosition() > startLocation.getPosition()))
             {
                 Path potentialFinishedPath = *j;
                 potentialFinishedPath.m_endLocation = endLocation;
+                if (trimEnds)
+                    potentialFinishedPath.trimOneBaseOffEachEnd();
                 int length = potentialFinishedPath.getLength();
                 if (length >= minDistance && length <= maxDistance)
                     finishedPaths.push_back(potentialFinishedPath);
@@ -926,4 +965,353 @@ double Path::getEndFraction() const
 int Path::getNodeCount() const
 {
     return m_nodes.size();
+}
+
+
+
+//This function uses an implementation of Dijkstra's algorithm to find the
+//shortest path between two locations.
+//It returns a list of length zero (if it failed to find a shortest path) or
+//a list of length one (if it succeeded).
+QList<Path> Path::getShortestPath(GraphLocation startLocation,
+                                  GraphLocation endLocation)
+{
+    DeBruijnNode * startingNode = startLocation.getNode();
+    DeBruijnNode * destinationNode = endLocation.getNode();
+
+    const int INF = std::numeric_limits<int>::max();
+
+    //We need to handle the special case of when our destination is before our
+    //start but in the same node.  In this situation, we must visit the first
+    //node twice.
+    bool visitFirstNodeTwice = false;
+    if (startingNode == destinationNode &&
+            startLocation.getPosition() >= endLocation.getPosition())
+        visitFirstNodeTwice = true;
+
+    //Initialise the distances to infinity, initialise the paths to an empty
+    //path and label all nodes as unvisited.
+    QHash<DeBruijnNode *, int> distances;
+    QHash<DeBruijnNode *, Path> paths;
+    QMapIterator<QString, DeBruijnNode*> i(g_assemblyGraph->m_deBruijnGraphNodes);
+    while (i.hasNext())
+    {
+        i.next();
+        DeBruijnNode * node = i.value();
+
+        distances.insert(node, INF);
+        paths.insert(node, Path());
+    }
+
+    //Set the starting node distance to a non-INF value and set its path.
+    int distanceFromStartLocationToEndOfStartNode = startingNode->getLength() - startLocation.getPosition();
+    distances.insert(startingNode, distanceFromStartLocationToEndOfStartNode);
+    paths.insert(startingNode, Path::makePathToEndOfNode(startLocation));
+
+    //Create a priority queue of the nodes using their distance.
+    std::set<std::pair<int, DeBruijnNode *> > nodeQueue;
+    nodeQueue.insert(std::make_pair(distances.value(startingNode), startingNode));
+
+    //The main Dijkstra's algorithm loop.
+    while (!nodeQueue.empty())
+    {
+        //Note the current distance, node and path. The set is ordered, so this
+        //will always be the node with the smallest distance.
+        int distance = nodeQueue.begin()->first;
+        DeBruijnNode * node = nodeQueue.begin()->second;
+        Path path = paths.value(node);
+
+        //If the destination node has been visited, then the search is
+        //finished!
+        if (node == destinationNode && !visitFirstNodeTwice)
+        {
+            Path shortestPath = path;
+            shortestPath.setEndLocation(endLocation);
+            shortestPath.trimOneBaseOffEachEnd();
+            QList<Path> returnList;
+            returnList.push_back(shortestPath);
+            return returnList;
+        }
+
+        //Remove the current node from the queue.
+        nodeQueue.erase(nodeQueue.begin());
+
+        //If our start node is our end node (but with a later start position
+        //than end position) and this is our first time visiting it, then we
+        //need to reset its distance so it will get visited again.
+        if (node == destinationNode && visitFirstNodeTwice)
+        {
+            distances.insert(node, INF);
+            visitFirstNodeTwice = false;
+        }
+
+        //Look at each of the current node's neighbours.
+        std::vector<DeBruijnNode *> neighbours = node->getDownstreamNodes();
+        for (size_t i = 0; i < neighbours.size(); ++i)
+        {
+            DeBruijnNode * neighbour = neighbours[i];
+            int oldDistance = distances.value(neighbour);
+            int newDistance = distance + neighbour->getLength();
+
+            //If the distance is an improvement...
+            if (newDistance < oldDistance)
+            {
+                //Update the path for the neighbour
+                Path newPath = path;
+                newPath.addNodeToEndNoCheck(neighbour);
+                paths.insert(neighbour, newPath);
+
+                //Update the distance for the neighbour
+                distances.insert(neighbour, newDistance);
+
+                //The neighbour may or may not already be in the queue, but we
+                //want to erase it if it is.
+                nodeQueue.erase(std::make_pair(oldDistance, neighbour));
+
+                //Add the neighbour to the queue, with the new distance.
+                nodeQueue.insert(std::make_pair(newDistance, neighbour));
+            }
+        }
+    }
+
+    //If the code got here, then no shortest path was found, meaning that the
+    //two locations are disconnected.  Return an empty path.
+    return QList<Path>();
+}
+
+
+
+//This function checks to see if any part of the other path overlaps with this
+//one and returns true if so.  It only checks the nodes in the paths, so it is
+//a same-strand-only overlap check.
+bool Path::overlapsSameStrand(Path * other) const
+{
+    QList<DeBruijnNode *> path1Nodes = getNodes();
+    QList<DeBruijnNode *> path2Nodes = other->getNodes();
+
+    //If either path is empty, then they can't overlap.
+    if (path1Nodes.empty() || path2Nodes.empty())
+        return false;
+
+    bool path1Circular = isCircular();
+    bool path2Circular = other->isCircular();
+
+
+    //If any of the whole nodes in the first path are also whole nodes in the
+    //second path, then the paths overlap.
+    for (int i = 0; i < path1Nodes.size(); ++i)
+    {
+        DeBruijnNode * path1Node = path1Nodes[i];
+        int path1NodeStart = 1;
+        int path1NodeEnd = path1Node->getLength();
+
+        //If this is the first and/or last node, then we update the start and/or
+        //end positions.
+        if (!path1Circular)
+        {
+            if (i == 0)
+                path1NodeStart = getStartLocation().getPosition();
+            if (i == path1Nodes.size() - 1)
+                path1NodeEnd = getEndLocation().getPosition();
+        }
+
+        for (int j = 0; j < path2Nodes.size(); ++j)
+        {
+            DeBruijnNode * path2Node = path2Nodes[j];
+            int path2NodeStart = 1;
+            int path2NodeEnd = path2Node->getLength();
+
+            //If this is the first and/or last node, then we update the start and/or
+            //end positions.
+            if (!path2Circular)
+            {
+                if (j == 0)
+                    path2NodeStart = other->getStartLocation().getPosition();
+                if (j == path2Nodes.size() - 1)
+                    path2NodeEnd = other->getEndLocation().getPosition();
+            }
+
+            //If we find that the a node is in both paths, then we must check
+            //to see if they overlap.
+            if (path1Node == path2Node)
+            {
+                if (path1NodeEnd >= path2NodeStart && path2NodeEnd >= path1NodeStart)
+                    return true;
+            }
+        }
+    }
+
+    //If the code got here, that means that none of the nodes in the paths
+    //overlap.
+    return false;
+}
+
+
+//This node checks whether two paths overlap on opposite strands.  This is a
+//more difficult test, because for LastGraph graphs, the nodes are shifted, so
+//there isn't an easy way to change a path into its reverse complement.
+//It does the somewhat laborious task of taking each position in the path,
+//grabbing the reverse complement position and checking to see if that's in the
+//other path.
+//Note that this isn't bullet-proof, as there can be multiple possible reverse
+//complement positions in a LastGraph graph, but I think it is good enough.
+bool Path::overlapsOppositeStrand(Path * other) const
+{
+    //If there is only one node in the path, then things are simpler.  We just
+    //check each of the path positions in that node.
+    if (m_nodes.size() == 1)
+    {
+        DeBruijnNode * node = m_startLocation.getNode();
+        int startPosition = m_startLocation.getPosition();
+        int endPosition = m_endLocation.getPosition();
+
+        for (int i = startPosition; i <= endPosition; ++i)
+        {
+            GraphLocation pathLocation(node, i);
+            GraphLocation reverseComplement = pathLocation.reverseComplementLocation();
+            if (other->containsLocation(reverseComplement))
+                return true;
+        }
+
+        return false;
+    }
+
+    //If there are multiple nodes in the path, then we must treat the first,
+    //middle and last node differently.
+
+    DeBruijnNode * startNode = m_startLocation.getNode();
+    int startPosition = m_startLocation.getPosition();
+    for (int i = startPosition; i <= startNode->getLength(); ++i)
+    {
+        GraphLocation pathLocation(startNode, i);
+        GraphLocation reverseComplement = pathLocation.reverseComplementLocation();
+        if (other->containsLocation(reverseComplement))
+            return true;
+    }
+
+    for (int i = 1; i < m_nodes.size() - 1; ++i)
+    {
+        DeBruijnNode * middleNode = m_nodes[i];
+        for (int i = 1; i <= middleNode->getLength(); ++i)
+        {
+            GraphLocation pathLocation(middleNode, i);
+            GraphLocation reverseComplement = pathLocation.reverseComplementLocation();
+            if (other->containsLocation(reverseComplement))
+                return true;
+        }
+    }
+
+    DeBruijnNode * endNode = m_endLocation.getNode();
+    int endPosition = m_endLocation.getPosition();
+    for (int i = 1; i <= endPosition; ++i)
+    {
+        GraphLocation pathLocation(endNode, i);
+        GraphLocation reverseComplement = pathLocation.reverseComplementLocation();
+        if (other->containsLocation(reverseComplement))
+            return true;
+    }
+
+    return false;
+}
+
+
+
+//This function reduces a path size by two, by trimming a base off each end.  If
+//the path only has 1 or 2 bases, this will result in an empty path.
+void Path::trimOneBaseOffEachEnd()
+{
+    //Can't trim bases from circular paths.
+    if (isCircular())
+        return;
+
+    trimOneBaseOffStart();
+    trimOneBaseOffEnd();
+
+    //Check to see if the path still has a length of at least 1.  If not, make
+    //it an empty path.
+    if (getLength() < 1)
+    {
+        m_nodes.clear();
+        m_edges.clear();
+    }
+}
+
+
+void Path::trimOneBaseOffStart()
+{
+    DeBruijnNode * startNode = m_startLocation.getNode();
+    int startPosition = m_startLocation.getPosition();
+
+    //If there is room in the first node to move forward by one, do that.
+    if (startPosition < startNode->getLength())
+        m_startLocation.moveLocation(1);
+
+    //If not, we have to remove the start node and set the Path start to the
+    //beginning of the next node.
+    else
+    {
+        if (m_nodes.size() > 0)
+            m_nodes.pop_front();
+        if (m_edges.size() > 0)
+            m_edges.pop_front();
+        if (m_nodes.isEmpty())
+            return;
+        m_startLocation = GraphLocation::startOfNode(m_nodes.front());
+    }
+}
+
+
+void Path::trimOneBaseOffEnd()
+{
+    int endPosition = m_endLocation.getPosition();
+
+    //If there is room in the last node to move backward by one, do that.
+    if (endPosition > 1)
+        m_endLocation.moveLocation(-1);
+
+    //If not, we have to remove the last node and set the Path end to the
+    //end of the new last node.
+    else
+    {
+        if (m_nodes.size() > 0)
+            m_nodes.pop_back();
+        if (m_edges.size() > 0)
+            m_edges.pop_back();
+        if (m_nodes.isEmpty())
+            return;
+        m_endLocation = GraphLocation::endOfNode(m_nodes.back());
+    }
+}
+
+
+
+bool Path::containsLocation(GraphLocation location) const
+{
+    if (location.isNull())
+        return false;
+
+    DeBruijnNode * node = location.getNode();
+
+    if (!containsNode(node))
+        return false;
+    if (containsEntireNode(node))
+        return true;
+
+    //If the code got here, then the location's node is partially contained in
+    //the path, which means that it is either the first or last node in the
+    //path.
+
+    int position = location.getPosition();
+
+    bool isStartNode = node == m_startLocation.getNode();
+    bool isEndNode = node == m_endLocation.getNode();
+
+    if (isStartNode && isEndNode)
+        return position >= m_startLocation.getPosition() && position <= m_endLocation.getPosition();
+    if (isStartNode)
+        return position >= m_startLocation.getPosition();
+    if (isEndNode)
+        return position <= m_endLocation.getPosition();
+
+    return false;
 }

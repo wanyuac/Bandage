@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -31,15 +31,14 @@ class GraphLayoutWorker : public QObject
 public:
     GraphLayoutWorker(ogdf::FMMMLayout * fmmm, ogdf::GraphAttributes * graphAttributes,
                       ogdf::EdgeArray<double> * edgeArray, int graphLayoutQuality, bool linearLayout,
-                      double graphLayoutComponentSeparation, double aspectRatio = 1.333333);
+                      double aspectRatio = 1.333333);
 
     ogdf::FMMMLayout * m_fmmm;
     ogdf::GraphAttributes * m_graphAttributes;
     ogdf::EdgeArray<double> * m_edgeArray;
     int m_graphLayoutQuality;
-    bool m_linearLayout;
-    double m_graphLayoutComponentSeparation;
     double m_aspectRatio;
+    bool m_linearLayout;
 
 public slots:
     void layoutGraph();

@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -25,6 +25,7 @@
 #include "../command_line/load.h"
 #include "../command_line/info.h"
 #include "../command_line/image.h"
+#include "../command_line/distance.h"
 #include "../command_line/querypaths.h"
 #include "../command_line/reduce.h"
 #include "../command_line/commoncommandlinefunctions.h"
@@ -50,6 +51,7 @@ void printUsage(QTextStream * out, bool all)
     text << "load         Launch the Bandage GUI and load a graph file";
     text << "info         Display information about a graph";
     text << "image        Generate an image file of a graph";
+    text << "distance     find distance(s) between two BLAST queries";
     text << "querypaths   Output graph paths for BLAST queries";
     text << "reduce       Save a subgraph of a larger graph";
     text << "";
@@ -89,7 +91,7 @@ int main(int argc, char *argv[])
     bool imageWithText = (first.toLower() == "image") &&
                          (arguments.contains("--names") || arguments.contains("--lengths") ||
                           arguments.contains("--depth") || arguments.contains("--blasthits"));
-    bool guiNeeded = (first == "") || first.startsWith("-") || (first.toLower() == "load") || imageWithText;
+    bool guiNeeded = (first == "") || (first.toLower() == "load") || imageWithText;
     if (checkForHelp(arguments) || checkForHelpAll(arguments))
         guiNeeded = false;
     if (!guiNeeded)
@@ -113,7 +115,7 @@ int main(int argc, char *argv[])
     #endif //Q_OS_WIN32
 
     QApplication::setApplicationName("Bandage");
-    QApplication::setApplicationVersion("0.8.1");
+    QApplication::setApplicationVersion("0.8.0");
 
     QTextStream out(stdout);
     QTextStream err(stderr);
@@ -143,6 +145,12 @@ int main(int argc, char *argv[])
             arguments.pop_front();
             g_memory->commandLineCommand = BANDAGE_IMAGE;
             return bandageImage(arguments);
+        }
+        else if (first.toLower() == "distance")
+        {
+            arguments.pop_front();
+            g_memory->commandLineCommand = BANDAGE_DISTANCE;
+            return bandageDistance(arguments);
         }
         else if (first.toLower() == "querypaths")
         {

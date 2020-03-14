@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -85,7 +85,6 @@ public:
     FloatSetting edgeLength;
     FloatSetting doubleModeNodeSeparation;
     FloatSetting nodeSegmentLength;
-    FloatSetting componentSeparation;
 
     FloatSetting averageNodeWidth;
     FloatSetting depthEffectOnWidth;
@@ -190,6 +189,18 @@ public:
     //This holds the BLAST search parameters that a user can change before
     //running a BLAST search.
     QString blastSearchParameters;
+
+    //These are the settings for the 'Distance between queries' dialog.
+    IntSetting distancePathSearchDepth;
+    IntSetting minDistancePathLength;
+    IntSetting maxDistancePathLength;
+    bool distanceOverlapOrientationSameStrand;
+    bool distanceOverlapOrientationOppositeStrand;
+    bool distanceOrientation1;
+    bool distanceOrientation2;
+    bool distanceOrientation3;
+    bool distanceOrientation4;
+    bool findAllDistancePaths;
 
     //These are the optional BLAST hit filters: whether or not they are used and
     //what their values are.

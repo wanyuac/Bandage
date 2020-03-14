@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -25,9 +25,12 @@
 class QueryDistance
 {
 public:
-    QueryDistance(Path path, QString orientation);
+    QueryDistance(Path query1Path, Path query2Path, Path distancePath,
+                  QString orientation);
 
-    Path m_path;
+    Path m_query1Path;
+    Path m_query2Path;
+    Path m_distancePath;
     int m_distance;
     QString m_orientation;
 

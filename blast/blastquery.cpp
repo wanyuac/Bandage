@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -284,4 +284,31 @@ double BlastQuery::fractionCoveredByHits(const QList<BlastHit *> * hitsToCheck) 
         hitBases += mergedRanges[i].second - mergedRanges[i].first;
 
     return double(hitBases) / queryLength;
+}
+
+
+//Returns a list containing the best query paths. If there are no query paths,
+//it returns an empty list. If the best path is not a tie, then it will return
+//a list of just one path. And if the best path is a tie, it will return all of
+//the paths which tie for best.
+QList<BlastQueryPath> BlastQuery::getBestPaths() const
+{
+    QList<BlastQueryPath> bestPaths;
+    if (m_paths.isEmpty())
+        return bestPaths;
+
+    bestPaths.push_back(m_paths[0]);
+    for (int i = 1; i < m_paths.size(); ++i)
+    {
+        //If this path is equivalent to the best path(s), it also goes in the
+        //list.
+        if (m_paths[0].getEvalueProduct() == m_paths[i].getEvalueProduct() &&
+            m_paths[0].getMeanHitPercIdentity() == m_paths[i].getMeanHitPercIdentity() &&
+            m_paths[0].getRelativeLengthDiscrepancy() == m_paths[i].getRelativeLengthDiscrepancy() &&
+            m_paths[0].getHitsQueryCoverage() == m_paths[i].getHitsQueryCoverage())
+            bestPaths.push_back(m_paths[i]);
+        else
+            break;
+    }
+    return bestPaths;
 }

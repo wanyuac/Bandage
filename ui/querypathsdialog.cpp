@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage.
 
@@ -26,7 +26,7 @@
 #include "../program/globals.h"
 #include "../program/memory.h"
 #include <QTableWidgetItem>
-#include "querypathsequencecopybutton.h"
+#include "pathsequencecopybutton.h"
 
 QueryPathsDialog::QueryPathsDialog(QWidget * parent, BlastQuery * query) :
     QDialog(parent),
@@ -119,7 +119,7 @@ QueryPathsDialog::QueryPathsDialog(QWidget * parent, BlastQuery * query) :
             pathStart = pathSequence.left(8) + "...";
 
         QTableWidgetItem * sequenceCopy = new QTableWidgetItem(pathStart);
-        QueryPathSequenceCopyButton * sequenceCopyButton = new QueryPathSequenceCopyButton(pathSequence, pathStart);
+        PathSequenceCopyButton * sequenceCopyButton = new PathSequenceCopyButton(pathSequence, pathStart);
 
         ui->tableWidget->setItem(i, 0, pathString);
         ui->tableWidget->setItem(i, 1, pathLength);

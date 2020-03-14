@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -29,6 +29,7 @@
 #include "../program/globals.h"
 #include "../ui/mygraphicsscene.h"
 #include "path.h"
+#include "../blast/blastquerypath.h"
 #include <QPair>
 
 class DeBruijnNode;
@@ -131,6 +132,21 @@ public:
     static void readFastaFile(QString filename, std::vector<QString> * names,
                               std::vector<QByteArray> * sequences);
 
+    void findAllPaths(QList<BlastQueryPath> query1Paths,
+                      QList<BlastQueryPath> query2Paths,
+                      bool overlapOrientationSameStrand,
+                      bool overlapOrientationOppositeStrand,
+                      bool orientation1, bool orientation2, bool orientation3,
+                      bool orientation4, int pathSearchDepth, int minDistance,
+                      int maxDistance);
+
+    void findShortestPaths(QList<BlastQueryPath> query1Paths,
+                           QList<BlastQueryPath> query2Paths,
+                           bool overlapOrientationSameStrand,
+                           bool overlapOrientationOppositeStrand,
+                           bool orientation1, bool orientation2,
+                           bool orientation3, bool orientation4);
+
     int getDrawnNodeCount() const;
     void deleteNodes(std::vector<DeBruijnNode *> * nodes);
     void deleteEdges(std::vector<DeBruijnEdge *> * edges);
@@ -166,7 +182,6 @@ public:
     QPair<int, int> getOverlapRange() const;
     bool attemptToLoadSequencesFromFasta();
     long long getTotalLengthOrphanedNodes() const;
-    bool useLinearLayout() const;
 
 
 private:
@@ -185,6 +200,13 @@ private:
     int getLengthFromCigar(QString cigar);
     int getCigarCount(QString cigarCode, QString cigar);
     QString getOppositeNodeName(QString nodeName);
+    void findPaths(bool allPaths, QList<BlastQueryPath> query1Paths,
+                   QList<BlastQueryPath> query2Paths,
+                   bool overlapOrientationSameStrand,
+                   bool overlapOrientationOppositeStrand,
+                   bool orientation1, bool orientation2, bool orientation3,
+                   bool orientation4, int pathSearchDepth = 0,
+                   int minDistance = 0, int maxDistance = 0);
     void clearAllCsvData();
     QString getNodeNameFromString(QString string);
     QString getNewNodeName(QString oldNodeName);
@@ -197,7 +219,7 @@ private:
     void mergeGraphicsNodes(QList<DeBruijnNode *> * originalNodes,
                             QList<DeBruijnNode *> * revCompOriginalNodes,
                             DeBruijnNode * newNode, MyGraphicsScene * scene);
-    bool mergeGraphicsNodes2(QList<DeBruijnNode *> * originalNodes,
+    void mergeGraphicsNodes2(QList<DeBruijnNode *> * originalNodes,
                              DeBruijnNode * newNode, MyGraphicsScene * scene);
     void removeAllGraphicsEdgesFromNode(DeBruijnNode * node,
                                         bool reverseComplement,

@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -145,6 +145,7 @@ private slots:
     void afterMainWindowShow();
     void startingNodesExactMatchChanged();
     void openPathSpecifyDialog();
+    void openDistanceDialog();
     void nodeWidthChanged();
     void saveEntireGraphToFasta();
     void saveEntireGraphToFastaOnlyPositiveNodes();

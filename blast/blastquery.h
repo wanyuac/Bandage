@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -48,6 +48,7 @@ public:
     QColor getColour() const {return m_colour;}
     SequenceType getSequenceType() const {return m_sequenceType;}
     QList<BlastQueryPath> getPaths() const {return m_paths;}
+    QList<BlastQueryPath> getBestPaths() const;
     int getPathCount() const {return m_paths.size();}
     QString getTypeString() const;
     double fractionCoveredByHits(const QList<BlastHit *> * hitsToCheck = 0) const;

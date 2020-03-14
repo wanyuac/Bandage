@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -590,7 +590,7 @@ void AssemblyGraph::buildDeBruijnGraphFromGfa(QString fullFileName, bool *unsupp
             if (lineParts.size() < 1)
                 continue;
 
-            //Lines beginning with "H" are header lines.
+            //Lines beginning with "H" are sequence (node) lines.
             if (lineParts.at(0) == "H") {
 
                 // Check for a tag containing Bandage options.
@@ -686,23 +686,20 @@ void AssemblyGraph::buildDeBruijnGraphFromGfa(QString fullFileName, bool *unsupp
                 //we can use the same tag in the output.
                 double nodeDepth = 1.0;
                 if (dpFound) {
-                    m_depthTag = "DP";
                     nodeDepth = dp;
+                    m_depthTag = "DP";
                 }
                 else if (kcFound) {
+                    nodeDepth = kc / length;
                     m_depthTag = "KC";
-                    if (length > 0)
-                        nodeDepth = kc / length;
                 }
                 else if (rcFound) {
+                    nodeDepth = rc / length;
                     m_depthTag = "RC";
-                    if (length > 0)
-                        nodeDepth = rc / length;
                 }
                 else if (fcFound) {
+                    nodeDepth = fc / length;
                     m_depthTag = "FC";
-                    if (length > 0)
-                        nodeDepth = fc / length;
                 }
 
                 //We check to see if the node ended in a "+" or "-".
@@ -1395,27 +1392,28 @@ void AssemblyGraph::buildDeBruijnGraphFromPlainFasta(QString fullFileName)
     std::vector<QByteArray> sequences;
     readFastaFile(fullFileName, &names, &sequences);
 
-    std::vector<QString> circularNodeNames;
     for (size_t i = 0; i < names.size(); ++i)
     {
         QApplication::processEvents();
 
         QString name = names[i];
-        QString lowerName = name.toLower();
         double depth = 1.0;
         QByteArray sequence = sequences[i];
 
-        // Check to see if the node name matches the Velvet/SPAdes contig format.  If so, we can get the depth and node
-        // number.
+        //Check to see if the node name matches the Velvet/SPAdes contig
+        //format.  If so, we can get the depth and node number.
         QStringList thisNodeDetails = name.split("_");
-        if (thisNodeDetails.size() >= 6 && thisNodeDetails[2] == "length" && thisNodeDetails[4] == "cov") {
+        if (thisNodeDetails.size() >= 6 && thisNodeDetails[2] == "length" && thisNodeDetails[4] == "cov")
+        {
             name = thisNodeDetails[1];
             depth = thisNodeDetails[5].toDouble();
             m_depthTag = "KC";
         }
 
-        // If it doesn't match, then we will use the sequence name up to the first space.
-        else {
+        //If it doesn't match, then we will use the sequence name up to the
+        //first space.
+        else
+        {
             QStringList nameParts = name.split(" ");
             if (nameParts.size() > 0)
                 name = nameParts[0];
@@ -1423,21 +1421,6 @@ void AssemblyGraph::buildDeBruijnGraphFromPlainFasta(QString fullFileName)
 
         name = cleanNodeName(name);
         name = getUniqueNodeName(name) + "+";
-
-        //  Look for "depth=" and "circular=" in the full header and use them if possible.
-        if (lowerName.contains("depth=")) {
-            QString depthString = lowerName.split("depth=")[1];
-            if (depthString.contains("x"))
-                depthString = depthString.split("x")[0];
-            else
-                depthString = depthString.split(" ")[0];
-            bool ok;
-            double depthFromString = depthString.toFloat(&ok);
-            if (ok)
-                depth = depthFromString;
-        }
-        if (lowerName.contains("circular=true"))
-            circularNodeNames.push_back(name);
 
         if (name.length() < 1)
             throw "load error";
@@ -1447,11 +1430,6 @@ void AssemblyGraph::buildDeBruijnGraphFromPlainFasta(QString fullFileName)
         makeReverseComplementNodeIfNecessary(node);
     }
     pointEachNodeToItsReverseComplement();
-
-    // For any circular nodes, make an edge connecting them to themselves.
-    for (auto circularNodeName : circularNodeNames) {
-        createDeBruijnEdge(circularNodeName, circularNodeName, 0, EXACT_OVERLAP);
-    }
 }
 
 
@@ -1859,7 +1837,7 @@ void AssemblyGraph::buildOgdfGraphFromNodesAndEdges(std::vector<DeBruijnNode *> 
         }
 
         // Now we add the drawn nodes to the OGDF graph, given them initial positions based on their sort order.
-        QSet<QPair<long long, long long> > usedStartPositions;
+        QSet<QPair<double, double> > usedStartPositions;
         double lastXPos = 0.0;
         for (int i = 0; i < sortedDrawnNodes.size(); ++i) {
             DeBruijnNode * node = sortedDrawnNodes[i];
@@ -1879,14 +1857,10 @@ void AssemblyGraph::buildOgdfGraphFromNodesAndEdges(std::vector<DeBruijnNode *> 
             }
             double xPos = lastXPos + g_settings->edgeLength;
             double yPos = 0.0;
-            long long intXPos = (long long)(xPos * 100.0);
-            long long intYPos = (long long)(yPos * 100.0);
-            while (usedStartPositions.contains(QPair<long long, long long>(intXPos, intYPos))) {
+            while (usedStartPositions.contains(QPair<double, double>(xPos, yPos)))
                 yPos += g_settings->edgeLength;
-                intYPos = (long long)(yPos * 100.0);
-            }
             node->addToOgdfGraph(m_ogdfGraph, m_graphAttributes, m_edgeArray, xPos, yPos);
-            usedStartPositions.insert(QPair<long long, long long>(intXPos, intYPos));
+            usedStartPositions.insert(QPair<double, double>(xPos, yPos));
             lastXPos = m_graphAttributes->x(node->getOgdfNode()->getLast());
         }
     }
@@ -2247,8 +2221,7 @@ void AssemblyGraph::layoutGraph()
     ogdf::FMMMLayout fmmm;
     GraphLayoutWorker * graphLayoutWorker = new GraphLayoutWorker(&fmmm, m_graphAttributes, m_edgeArray,
                                                                   g_settings->graphLayoutQuality,
-                                                                  useLinearLayout(),
-                                                                  g_settings->componentSeparation);
+                                                                  g_settings->linearLayout);
     graphLayoutWorker->layoutGraph();
 }
 
@@ -2456,6 +2429,223 @@ void AssemblyGraph::recalculateAllNodeWidths()
 }
 
 
+//This function carries out a distance search between two queries.  It stores
+//the results in the g_memory object.
+//It looks for all paths, but since there could be an infinite number of paths
+//between two queries, it is constrained by a node depth and path lengths.
+void AssemblyGraph::findAllPaths(QList<BlastQueryPath> query1Paths,
+                                 QList<BlastQueryPath> query2Paths,
+                                 bool overlapOrientationSameStrand,
+                                 bool overlapOrientationOppositeStrand,
+                                 bool orientation1,
+                                 bool orientation2, bool orientation3,
+                                 bool orientation4, int pathSearchDepth,
+                                 int minDistance, int maxDistance)
+{
+    findPaths(true, query1Paths, query2Paths, overlapOrientationSameStrand,
+              overlapOrientationOppositeStrand, orientation1, orientation2,
+              orientation3, orientation4, pathSearchDepth, minDistance,
+              maxDistance);
+}
+
+
+
+//This function looks for the shortest path between two queries.  It stores the
+//results in the g_memory object.
+void AssemblyGraph::findShortestPaths(QList<BlastQueryPath> query1Paths,
+                                      QList<BlastQueryPath> query2Paths,
+                                      bool overlapOrientationSameStrand,
+                                      bool overlapOrientationOppositeStrand,
+                                      bool orientation1, bool orientation2,
+                                      bool orientation3, bool orientation4)
+{
+    findPaths(false, query1Paths, query2Paths, overlapOrientationSameStrand,
+              overlapOrientationOppositeStrand, orientation1, orientation2,
+              orientation3, orientation4);
+}
+
+
+
+//This function implements either all 'all paths' or 'shortest paths' search,
+//depending on the value of the first argument.  The last three arguments are
+//only used for an 'all paths' search.
+//It stores the results in the g_memory object.
+void AssemblyGraph::findPaths(bool allPaths, QList<BlastQueryPath> query1Paths,
+                              QList<BlastQueryPath> query2Paths,
+                              bool overlapOrientationSameStrand,
+                              bool overlapOrientationOppositeStrand,
+                              bool orientation1, bool orientation2,
+                              bool orientation3, bool orientation4,
+                              int pathSearchDepth, int minDistance,
+                              int maxDistance)
+{
+    g_memory->distanceSearchResults.clear();
+
+    QList<Path> resultsQuery1Paths;
+    QList<Path> resultsQuery2Paths;
+    QList<Path> resultsDistancePaths;
+    QStringList resultsOrientations;
+
+    for (int i = 0; i < query1Paths.size(); ++i)
+    {
+        Path query1Path = query1Paths[i].getPath();
+
+        for (int j = 0; j < query2Paths.size(); ++j)
+        {
+            Path query2Path = query2Paths[j].getPath();
+
+            //Overlap orientation same strand
+            if (overlapOrientationSameStrand && query1Path.overlapsSameStrand(&query2Path))
+            {
+                //Use an empty path for overlaps.
+                resultsDistancePaths.push_back(Path());
+                resultsOrientations.push_back("overlap (same)");
+            }
+
+            //Overlap orientation different strand
+            if (overlapOrientationOppositeStrand && query1Path.overlapsOppositeStrand(&query2Path))
+            {
+                //Use an empty path for overlaps.
+                resultsDistancePaths.push_back(Path());
+                resultsOrientations.push_back("overlap (opposite)");
+            }
+
+            //1-> 2-> orientation
+            if (orientation1)
+            {
+                GraphLocation start = query1Path.getEndLocation();
+                GraphLocation end = query2Path.getStartLocation();
+
+                if (allPaths)
+                    resultsDistancePaths.append(Path::getAllPossiblePaths(start, end, pathSearchDepth, minDistance, maxDistance, true));
+                else
+                    resultsDistancePaths.append(Path::getShortestPath(start, end));
+
+                while (resultsOrientations.size() < resultsDistancePaths.size())
+                    resultsOrientations.push_back("1-> 2->");
+            }
+
+            //2-> 1-> orientation
+            if (orientation2)
+            {
+                GraphLocation start = query2Path.getEndLocation();
+                GraphLocation end = query1Path.getStartLocation();
+
+                if (allPaths)
+                    resultsDistancePaths.append(Path::getAllPossiblePaths(start, end, pathSearchDepth, minDistance, maxDistance, true));
+                else
+                    resultsDistancePaths.append(Path::getShortestPath(start, end));
+
+                while (resultsOrientations.size() < resultsDistancePaths.size())
+                    resultsOrientations.push_back("2-> 1->");
+            }
+
+            //1-> <-2 orientation
+            if (orientation3)
+            {
+                GraphLocation start = query1Path.getEndLocation();
+                GraphLocation end = query2Path.getEndLocation().reverseComplementLocation();
+
+                if (allPaths)
+                    resultsDistancePaths.append(Path::getAllPossiblePaths(start, end, pathSearchDepth, minDistance, maxDistance, true));
+                else
+                    resultsDistancePaths.append(Path::getShortestPath(start, end));
+
+                while (resultsOrientations.size() < resultsDistancePaths.size())
+                    resultsOrientations.push_back("1-> <-2");
+            }
+
+            //<-1 2-> orientation
+            if (orientation4)
+            {
+                GraphLocation start = query1Path.getStartLocation().reverseComplementLocation();
+                GraphLocation end = query2Path.getStartLocation();
+
+                if (allPaths)
+                    resultsDistancePaths.append(Path::getAllPossiblePaths(start, end, pathSearchDepth, minDistance, maxDistance, true));
+                else
+                    resultsDistancePaths.append(Path::getShortestPath(start, end));
+
+                while (resultsOrientations.size() < resultsDistancePaths.size())
+                    resultsOrientations.push_back("<-1 2->");
+            }
+
+            while (resultsQuery1Paths.size() < resultsDistancePaths.size())
+            {
+                resultsQuery1Paths.push_back(query1Path);
+                resultsQuery2Paths.push_back(query2Path);
+            }
+        }
+    }
+
+    //We can have a lot of paths at this point, even if searching for the
+    //shortest, because each the search is done for each query path combination
+    //and each orientation.
+    //If we were searching for the shortest paths, then we need to exclude any
+    //other paths which are longer than the shortest.
+    if (!allPaths)
+    {
+        int shortestPathLength = std::numeric_limits<int>::max();
+        QList<Path> shortestQuery1Paths;
+        QList<Path> shortestQuery2Paths;
+        QList<Path> shortestDistancePaths;
+        QStringList shortestPathOrientations;
+        for (int i = 0; i < resultsDistancePaths.size(); ++i)
+        {
+            int pathLength = resultsDistancePaths[i].getLength();
+            if (pathLength < shortestPathLength)
+            {
+                shortestPathLength = pathLength;
+
+                shortestQuery1Paths.clear();
+                shortestQuery2Paths.clear();
+                shortestDistancePaths.clear();
+                shortestPathOrientations.clear();
+
+                shortestQuery1Paths.push_back(resultsQuery1Paths[i]);
+                shortestQuery2Paths.push_back(resultsQuery2Paths[i]);
+                shortestDistancePaths.push_back(resultsDistancePaths[i]);
+                shortestPathOrientations.push_back(resultsOrientations[i]);
+            }
+        }
+        resultsQuery1Paths = shortestQuery1Paths;
+        resultsQuery2Paths = shortestQuery2Paths;
+        resultsDistancePaths = shortestDistancePaths;
+        resultsOrientations = shortestPathOrientations;
+    }
+
+    //Save the results in the Memory object.
+    for (int i = 0; i < resultsDistancePaths.size(); ++i)
+        g_memory->distanceSearchResults.push_back(QueryDistance(resultsQuery1Paths[i],
+                                                                resultsQuery2Paths[i],
+                                                                resultsDistancePaths[i],
+                                                                resultsOrientations[i]));
+
+    //Duplicate paths are possible, because a query can have multiple paths
+    //that start and/or end at the same point.  So we now look for and remove
+    //duplicates.
+    QList<QueryDistance> uniqueDistanceSearchResults;
+    int distanceCount = g_memory->distanceSearchResults.size();
+    for (int i = 0; i < distanceCount; ++i)
+    {
+        QueryDistance distance = g_memory->distanceSearchResults[i];
+        bool match = false;
+        for (int j = i + 1; j < distanceCount; ++j)
+        {
+            if (distance == g_memory->distanceSearchResults[j])
+            {
+                match = true;
+                break;
+            }
+        }
+
+        if (!match)
+            uniqueDistanceSearchResults.push_back(distance);
+    }
+
+    std::sort(uniqueDistanceSearchResults.begin(), uniqueDistanceSearchResults.end());
+    g_memory->distanceSearchResults = uniqueDistanceSearchResults;
+}
 
 void AssemblyGraph::clearAllCsvData()
 {
@@ -2891,16 +3081,9 @@ void AssemblyGraph::mergeGraphicsNodes(QList<DeBruijnNode *> * originalNodes,
                                        DeBruijnNode * newNode,
                                        MyGraphicsScene * scene)
 {
-    bool success = mergeGraphicsNodes2(originalNodes, newNode, scene);
-    if (success)
-        newNode->setAsDrawn();
-
-    if (g_settings->doubleMode) {
-        DeBruijnNode * newRevComp = newNode->getReverseComplement();
-        bool revCompSuccess = mergeGraphicsNodes2(revCompOriginalNodes, newRevComp, scene);
-        if (revCompSuccess)
-            newRevComp->setAsDrawn();
-    }
+    mergeGraphicsNodes2(originalNodes, newNode, scene);
+    if (g_settings->doubleMode)
+        mergeGraphicsNodes2(revCompOriginalNodes, newNode->getReverseComplement(), scene);
 
     std::vector<DeBruijnNode *> nodesToRemove;
     for (int i = 0; i < originalNodes->size(); ++i)
@@ -2909,11 +3092,11 @@ void AssemblyGraph::mergeGraphicsNodes(QList<DeBruijnNode *> * originalNodes,
 }
 
 
-bool AssemblyGraph::mergeGraphicsNodes2(QList<DeBruijnNode *> * originalNodes,
+void AssemblyGraph::mergeGraphicsNodes2(QList<DeBruijnNode *> * originalNodes,
                                         DeBruijnNode * newNode,
                                         MyGraphicsScene * scene)
 {
-    bool success = true;
+    bool failed = false;
     std::vector<QPointF> linePoints;
 
     for (int i = 0; i < originalNodes->size(); ++i)
@@ -2932,7 +3115,7 @@ bool AssemblyGraph::mergeGraphicsNodes2(QList<DeBruijnNode *> * originalNodes,
         GraphicsItemNode * originalGraphicsItemNode = node->getGraphicsItemNode();
         if (originalGraphicsItemNode == 0)
         {
-            success = false;
+            failed = true;
             break;
         }
 
@@ -2952,7 +3135,7 @@ bool AssemblyGraph::mergeGraphicsNodes2(QList<DeBruijnNode *> * originalNodes,
         }
     }
 
-    if (success)
+    if (!failed)
     {
         GraphicsItemNode * newGraphicsItemNode = new GraphicsItemNode(newNode, linePoints);
 
@@ -2975,7 +3158,7 @@ bool AssemblyGraph::mergeGraphicsNodes2(QList<DeBruijnNode *> * originalNodes,
             scene->addItem(graphicsItemEdge);
         }
     }
-    return success;
+
 }
 
 
@@ -3777,13 +3960,4 @@ long long AssemblyGraph::getTotalLengthOrphanedNodes() const {
             total += node->getLength();
     }
     return total;
-}
-
-
-bool AssemblyGraph::useLinearLayout() const {
-    // If the graph has no edges, then we use a linear layout. Otherwise check the setting.
-    if (m_edgeCount == 0)
-        return true;
-    else
-        return g_settings->linearLayout;
 }

@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -152,10 +152,28 @@ void getSettingsUsage(QStringList * text)
     *text << "--minhitcov <float> Minimum fraction of a BLAST query which must be covered by BLAST hits in a query path " + getRangeAndDefault(g_settings->minQueryCoveredByHits);
     *text << "--minmeanid <float> Minimum mean identity of BLAST hits in a query path " + getRangeAndDefault(g_settings->minMeanHitIdentity);
     *text << "--maxevprod <sci>   Maximum e-value product for all BLAST hits in a query path " + getRangeAndDefault(g_settings->maxEValueProduct);
-    *text << "--minpatlen <float> Minimum allowed relative path length as compared to the query " + getRangeAndDefault(g_settings->minLengthPercentage);
-    *text << "--maxpatlen <float> Maximum allowed relative path length as compared to the query " + getRangeAndDefault(g_settings->maxLengthPercentage);
+    *text << "--minpatlen <float> Minimum allowed relative path length as compared to the corresponding region of the query " + getRangeAndDefault(g_settings->minLengthPercentage);
+    *text << "--maxpatlen <float> Maximum allowed relative path length as compared to the corresponding region of the query " + getRangeAndDefault(g_settings->maxLengthPercentage);
     *text << "--minlendis <int>   Minimum allowed length discrepancy (in bases) between a BLAST query and its path in the graph " + getRangeAndDefault(g_settings->minLengthBaseDiscrepancy);
     *text << "--maxlendis <int>   Maximum allowed length discrepancy (in bases) between a BLAST query and its path in the graph " + getRangeAndDefault(g_settings->maxLengthBaseDiscrepancy);
+    *text << "";
+    *text << "Distance between queries";
+    *text << dashes;
+    *text << "These settings control how Bandage searches for the distance between two BLAST queries.";
+    *text << "--alldistpath       Look for all possible paths in a 'distance between queries' search (default: only report the shortest path)";
+    *text << "";
+    *text << "If the '--alldistpath' option is used, then the following three settings control the limits on the path search. If the '--alldistpath' option is not used, these settings have no effect.";
+    *text << "--distnodes <int>   Maximum number of nodes allowed in a 'distance between queries' search (default: " + QString::number(g_settings->distancePathSearchDepth + 1) + ")";
+    *text << "--distmin <int>     Minimum path distance allowed in a 'distance between queries' search (default: " + QString::number(g_settings->minDistancePathLength) + ")";
+    *text << "--distmax <int>     Maximum path distance allowed in a 'distance between queries' search (default: " + QString::number(g_settings->maxDistancePathLength) + ")";
+    *text << "";
+    *text << "If none of the following six flags are used, all six orientations are allowed in a 'distance between queries' search. If any of the flags are used, only the specified orientations are allowed.";
+    *text << "--distover1         Look for query overlaps on the same strand";
+    *text << "--distover2         Look for query overlaps on opposite strands";
+    *text << "--distor1           Allow 1-> 2-> query orientation";
+    *text << "--distor2           Allow 2-> 1-> query orientation";
+    *text << "--distor3           Allow 1-> <-2 query orientation";
+    *text << "--distor4           Allow <-1 2-> query orientation";
     *text << "";
 }
 
@@ -291,6 +309,16 @@ QString checkForInvalidOrExcessSettings(QStringList * arguments)
     error = checkOptionForFloat("--maxpatlen", arguments, g_settings->maxLengthPercentage, true); if (error.length() > 0) return error;
     error = checkOptionForInt("--minlendis", arguments, g_settings->minLengthBaseDiscrepancy, true); if (error.length() > 0) return error;
     error = checkOptionForInt("--maxlendis", arguments, g_settings->maxLengthBaseDiscrepancy, true); if (error.length() > 0) return error;
+    checkOptionWithoutValue("--alldistpath", arguments);
+    error = checkOptionForInt("--distnodes", arguments, g_settings->distancePathSearchDepth, false); if (error.length() > 0) return error;
+    error = checkOptionForInt("--distmin", arguments, g_settings->minDistancePathLength, false); if (error.length() > 0) return error;
+    error = checkOptionForInt("--distmax", arguments, g_settings->maxDistancePathLength, false); if (error.length() > 0) return error;
+    checkOptionWithoutValue("--distover1", arguments);
+    checkOptionWithoutValue("--distover2", arguments);
+    checkOptionWithoutValue("--distor1", arguments);
+    checkOptionWithoutValue("--distor2", arguments);
+    checkOptionWithoutValue("--distor3", arguments);
+    checkOptionWithoutValue("--distor4", arguments);
     error = checkOptionForInt("--alfilter", arguments, g_settings->blastAlignmentLengthFilter, false); if (error.length() > 0) return error;
     error = checkOptionForFloat("--qcfilter", arguments, g_settings->blastQueryCoverageFilter, false); if (error.length() > 0) return error;
     error = checkOptionForFloat("--ifilter", arguments, g_settings->blastIdentityFilter, false); if (error.length() > 0) return error;
@@ -607,6 +635,38 @@ void parseSettings(QStringList arguments)
             g_settings->maxLengthBaseDiscrepancy.on = true;
             g_settings->maxLengthBaseDiscrepancy = getIntOption("--maxlendis", &arguments);
         }
+    }
+
+    g_settings->findAllDistancePaths = isOptionPresent("--alldistpath", &arguments);
+    if (isOptionPresent("--distnodes", &arguments))
+        g_settings->distancePathSearchDepth = getIntOption("--distnodes", &arguments) - 1;
+    if (isOptionPresent("--distmin", &arguments))
+        g_settings->minDistancePathLength = getIntOption("--distmin", &arguments);
+    if (isOptionPresent("--distmax", &arguments))
+        g_settings->maxDistancePathLength = getIntOption("--distmax", &arguments);
+
+    if (!isOptionPresent("--distover1", &arguments) &&
+            !isOptionPresent("--distover2", &arguments) &&
+            !isOptionPresent("--distor1", &arguments) &&
+            !isOptionPresent("--distor2", &arguments) &&
+            !isOptionPresent("--distor3", &arguments) &&
+            !isOptionPresent("--distor4", &arguments))
+    {
+        g_settings->distanceOverlapOrientationSameStrand = true;
+        g_settings->distanceOverlapOrientationOppositeStrand = true;
+        g_settings->distanceOrientation1 = true;
+        g_settings->distanceOrientation2 = true;
+        g_settings->distanceOrientation3 = true;
+        g_settings->distanceOrientation4 = true;
+    }
+    else
+    {
+        g_settings->distanceOverlapOrientationSameStrand = isOptionPresent("--distover1", &arguments);
+        g_settings->distanceOverlapOrientationOppositeStrand = isOptionPresent("--distover2", &arguments);
+        g_settings->distanceOrientation1 = isOptionPresent("--distor1", &arguments);
+        g_settings->distanceOrientation2 = isOptionPresent("--distor2", &arguments);
+        g_settings->distanceOrientation3 = isOptionPresent("--distor3", &arguments);
+        g_settings->distanceOrientation4 = isOptionPresent("--distor4", &arguments);
     }
 
     if (isOptionPresent("--alfilter", &arguments))

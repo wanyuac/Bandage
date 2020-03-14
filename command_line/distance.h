@@ -1,6 +1,6 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2015 Ryan Wick
 
-//This file is part of Bandage.
+//This file is part of Bandage
 
 //Bandage is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -16,24 +16,20 @@
 //along with Bandage.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#ifndef QUERYPATHSEQUENCECOPYBUTTON_H
-#define QUERYPATHSEQUENCECOPYBUTTON_H
+#ifndef DISTANCE_H
+#define DISTANCE_H
 
-#include <QPushButton>
 
-class QueryPathSequenceCopyButton : public QPushButton
-{
-    Q_OBJECT
+#include <QStringList>
+#include "../ui/mainwindow.h"
+#include <QTextStream>
+#include <QApplication>
 
-public:
-    QueryPathSequenceCopyButton(QByteArray pathSequence, QString pathStart);
+int bandageDistance(QStringList arguments);
+void printDistanceUsage(QTextStream * out, bool all);
+QString checkForInvalidDistanceOptions(QStringList arguments);
+void parseDistanceOptions(QStringList arguments, bool * allQueryPaths,
+                          bool * sequences);
 
-private:
-    QByteArray m_pathSequence;
 
-private slots:
-    void copySequenceToClipboard();
-
-};
-
-#endif // QUERYPATHSEQUENCECOPYBUTTON_H
+#endif // DISTANCE_H

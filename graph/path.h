@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -43,6 +43,7 @@ public:
                                      bool circular);
     static Path makeFromString(QString pathString, bool circular,
                                QString * pathStringFailure);
+    static Path makePathToEndOfNode(GraphLocation startLocation);
 
     //ACCESSORS
     QList<DeBruijnNode *> getNodes() const {return m_nodes;}
@@ -70,17 +71,24 @@ public:
     int getNodeCount() const;
     GraphLocation getStartLocation() const {return m_startLocation;}
     GraphLocation getEndLocation() const {return m_endLocation;}
+    bool overlapsSameStrand(Path * other) const;
+    bool overlapsOppositeStrand(Path * other) const;
     bool operator==(Path const &other) const;
-
-    //MODIFERS
+    bool containsLocation(GraphLocation location) const;
     bool addNode(DeBruijnNode * newNode, bool strandSpecific, bool makeCircularIfPossible);
+    void addNodeToEndNoCheck(DeBruijnNode * newNode);
     void extendPathToIncludeEntirityOfNodes();
+    void setEndLocation(GraphLocation newEnd) {m_endLocation = newEnd;}
+    void trimOneBaseOffEachEnd();
 
     //STATIC
     static QList<Path> getAllPossiblePaths(GraphLocation startLocation,
                                            GraphLocation endLocation,
                                            int nodeSearchDepth,
-                                           int minDistance, int maxDistance);
+                                           int minDistance, int maxDistance,
+                                           bool trimEnds = false);
+    static QList<Path> getShortestPath(GraphLocation startLocation,
+                                       GraphLocation endLocation);
 
 private:
     GraphLocation m_startLocation;
@@ -92,6 +100,8 @@ private:
                                        bool strandSpecific);
     QByteArray modifySequenceUsingOverlap(QByteArray sequence, int overlap) const;
     bool checkForOtherEdges();
+    void trimOneBaseOffStart();
+    void trimOneBaseOffEnd();
 };
 
 #endif // PATH_H

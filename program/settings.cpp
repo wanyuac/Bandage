@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -34,7 +34,6 @@ Settings::Settings()
     edgeLength = FloatSetting(5.0, 0.1, 100.0);
     doubleModeNodeSeparation = FloatSetting(2.0, 0.0, 100.0);
     nodeSegmentLength = FloatSetting(20.0, 1.0, 1000.0);
-    componentSeparation = FloatSetting(50.0, 0, 1000.0);
 
     averageNodeWidth = FloatSetting(5.0, 0.5, 1000.0);
     depthEffectOnWidth = FloatSetting(0.5, 0.0, 1.0);
@@ -132,6 +131,17 @@ Settings::Settings()
     maxLengthBaseDiscrepancy = IntSetting(100, -1000000, 1000000, false);
 
     blastSearchParameters = "";
+
+    distancePathSearchDepth = IntSetting(14, 1, 1000);
+    minDistancePathLength = IntSetting(0, 0, 1000000000);
+    maxDistancePathLength = IntSetting(1000000000, 0, 1000000000);
+    distanceOverlapOrientationSameStrand = true;
+    distanceOverlapOrientationOppositeStrand = true;
+    distanceOrientation1 = true;
+    distanceOrientation2 = true;
+    distanceOrientation3 = true;
+    distanceOrientation4 = true;
+    findAllDistancePaths = false;
 
     blastAlignmentLengthFilter = IntSetting(100, 1, 1000000, false);
     blastQueryCoverageFilter = FloatSetting(50.0, 0.0, 100.0, false);

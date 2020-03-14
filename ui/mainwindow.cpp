@@ -1,4 +1,4 @@
-﻿//Copyright 2017 Ryan Wick
+﻿//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -63,6 +63,7 @@
 #include "../graph/path.h"
 #include "pathspecifydialog.h"
 #include "../program/memory.h"
+#include "distancedialog.h"
 #include "changenodenamedialog.h"
 #include "changenodedepthdialog.h"
 #include <limits>
@@ -178,6 +179,7 @@ MainWindow::MainWindow(QString fileToLoadOnStartup, bool drawGraphAfterLoad) :
     connect(ui->maxDepthSpinBox, SIGNAL(valueChanged(double)), this, SLOT(depthRangeChanged()));
     connect(ui->startingNodesExactMatchRadioButton, SIGNAL(toggled(bool)), this, SLOT(startingNodesExactMatchChanged()));
     connect(ui->actionSpecify_exact_path_for_copy_save, SIGNAL(triggered()), this, SLOT(openPathSpecifyDialog()));
+    connect(ui->actionDistance_between_queries, SIGNAL(triggered(bool)), this, SLOT(openDistanceDialog()));
     connect(ui->nodeWidthSpinBox, SIGNAL(valueChanged(double)), this, SLOT(nodeWidthChanged()));
     connect(g_graphicsView, SIGNAL(copySelectedSequencesToClipboard()), this, SLOT(copySelectedSequencesToClipboard()));
     connect(g_graphicsView, SIGNAL(saveSelectedSequencesToFile()), this, SLOT(saveSelectedSequencesToFile()));
@@ -436,17 +438,17 @@ void MainWindow::loadGraph2(GraphFileType graphFileType, QString fullFileName)
         g_memory->clearGraphSpecificMemory();
 
         // If the graph has custom colours, automatically switch the colour scheme to custom colours.
-        if (customColours) {
-            if (ui->coloursComboBox->currentIndex() != 6)
-                ui->coloursComboBox->setCurrentIndex(6);
-            else
-                switchColourScheme();
-        }
+        if (customColours)
+            ui->coloursComboBox->setCurrentIndex(6);
 
         // If the graph doesn't have custom colours, but the colour scheme is on 'Custom', automatically switch it back
         // to the default of 'Random colours'.
         if (!customColours && ui->coloursComboBox->currentIndex() == 6)
             ui->coloursComboBox->setCurrentIndex(0);
+
+        // If the graph has custom labels, automatically turn them on.
+        if (customLabels)
+            ui->nodeCustomLabelsCheckBox->setChecked(true);
     }
 
     catch (...)
@@ -814,8 +816,7 @@ void MainWindow::layoutGraph()
     GraphLayoutWorker * graphLayoutWorker = new GraphLayoutWorker(m_fmmm, g_assemblyGraph->m_graphAttributes,
                                                                   g_assemblyGraph->m_edgeArray,
                                                                   g_settings->graphLayoutQuality,
-                                                                  g_assemblyGraph->useLinearLayout(),
-                                                                  g_settings->componentSeparation, aspectRatio);
+                                                                  g_settings->linearLayout, aspectRatio);
     graphLayoutWorker->moveToThread(m_layoutThread);
 
     connect(progress, SIGNAL(halt()), this, SLOT(graphLayoutCancelled()));
@@ -2131,6 +2132,13 @@ void MainWindow::openPathSpecifyDialog()
     PathSpecifyDialog * pathSpecifyDialog = new PathSpecifyDialog(this);
     connect(g_graphicsView, SIGNAL(doubleClickedNode(DeBruijnNode*)), pathSpecifyDialog, SLOT(addNodeName(DeBruijnNode*)));
     pathSpecifyDialog->show();
+}
+
+
+void MainWindow::openDistanceDialog()
+{
+    DistanceDialog distanceDialog(this);
+    distanceDialog.exec();
 }
 
 

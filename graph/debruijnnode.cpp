@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -116,7 +116,7 @@ void DeBruijnNode::addToOgdfGraph(ogdf::Graph * ogdfGraph, ogdf::GraphAttributes
         newNode = ogdfGraph->newNode();
         m_ogdfNode->addOgdfNode(newNode);
 
-        if (g_assemblyGraph->useLinearLayout()) {
+        if (g_settings->linearLayout) {
             graphAttributes->x(newNode) = xPos;
             graphAttributes->y(newNode) = yPos;
             xPos += g_settings->nodeSegmentLength;
@@ -816,15 +816,12 @@ void DeBruijnNode::setCustomLabel(QString newLabel)
 QStringList DeBruijnNode::getCustomLabelForDisplay() const
 {
     QStringList customLabelLines;
-    if (!getCustomLabel().isEmpty()) {
-        QStringList labelLines = getCustomLabel().split("\\n");
-        for (int i = 0; i < labelLines.size(); ++i)
-            customLabelLines << labelLines[i];
-    }
-    if (!g_settings->doubleMode && !m_reverseComplement->getCustomLabel().isEmpty()) {
-        QStringList labelLines2 = m_reverseComplement->getCustomLabel().split("\n");
-        for (int i = 0; i < labelLines2.size(); ++i)
-            customLabelLines << labelLines2[i];
+    if (!getCustomLabel().isEmpty())
+        customLabelLines << getCustomLabel();
+    if (!g_settings->doubleMode)
+    {
+        if (!m_reverseComplement->getCustomLabel().isEmpty())
+            customLabelLines << m_reverseComplement->getCustomLabel();
     }
     return customLabelLines;
 }

@@ -1,6 +1,6 @@
 //Copyright 2016 Ryan Wick
 
-//This file is part of Bandage
+//This file is part of Bandage.
 
 //Bandage is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -16,16 +16,24 @@
 //along with Bandage.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#ifndef LOAD_H
-#define LOAD_H
+#ifndef PATHSEQUENCECOPYBUTTON_H
+#define PATHSEQUENCECOPYBUTTON_H
 
-#include <QStringList>
-#include "../ui/mainwindow.h"
-#include <QTextStream>
+#include <QPushButton>
 
-int bandageLoad(QStringList arguments);
-void printLoadUsage(QTextStream * out, bool all);
-QString checkForInvalidLoadOptions(QStringList arguments);
-void parseLoadOptions(QStringList arguments, bool *drawGraph);
+class PathSequenceCopyButton : public QPushButton
+{
+    Q_OBJECT
 
-#endif // LOAD_H
+public:
+    PathSequenceCopyButton(QByteArray pathSequence, QString pathStart);
+
+private:
+    QByteArray m_pathSequence;
+
+private slots:
+    void copySequenceToClipboard();
+
+};
+
+#endif // PATHSEQUENCECOPYBUTTON_H

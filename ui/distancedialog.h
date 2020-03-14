@@ -1,6 +1,6 @@
-//Copyright 2016 Ryan Wick
+//Copyright 2015 Ryan Wick
 
-//This file is part of Bandage.
+//This file is part of Bandage
 
 //Bandage is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -16,27 +16,40 @@
 //along with Bandage.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#ifndef ABOUTDIALOG_H
-#define ABOUTDIALOG_H
+#ifndef DISTANCEDIALOG_H
+#define DISTANCEDIALOG_H
 
 #include <QDialog>
+#include <QComboBox>
 
+class BlastQuery;
 
 namespace Ui {
-class AboutDialog;
+class DistanceDialog;
 }
 
-class AboutDialog : public QDialog
+class DistanceDialog : public QDialog
 {
     Q_OBJECT
-    
+
 public:
-    explicit AboutDialog(QWidget *parent = 0);
-    ~AboutDialog();
-    
+    explicit DistanceDialog(QWidget *parent = 0);
+    ~DistanceDialog();
+
 private:
-    Ui::AboutDialog *ui;
+    Ui::DistanceDialog *ui;
+
+    void loadSettings();
+    void fillResultsTable();
+    void fillPathComboBox(BlastQuery * query, QComboBox * comboBox);
+    void setInfoTexts();
+
+private slots:
+    void findPaths();
+    void query1Changed();
+    void query2Changed();
+    void saveSettings();
+    void searchTypeChanged();
 };
 
-
-#endif // ABOUTDIALOG_H
+#endif // DISTANCEDIALOG_H

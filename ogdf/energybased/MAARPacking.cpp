@@ -107,11 +107,12 @@ void MAARPacking::pack_rectangles_using_Best_Fit_strategy(
     else if (widestRect / secondWidestRect > 5.0)
         wrapWidth = widestRect;
 
-    // If neither of the above two cases apply, then we binary search our way to a wrap width which brings us closest
+    // If neither of the above two cases apply, then we binary search our way to a wrap width which brings up closest
     // to the desired aspect ratio.
     else {
         wrapWidth = fullWidth;
         double fullWidthAspectRatio = getAspectRatio(R, fullWidth);
+        double bestAspectRatio = fullWidthAspectRatio;
         double bestAgreement = getAspectRatioAgreement(aspect_ratio, fullWidthAspectRatio);
 
         if (fullWidthAspectRatio > aspect_ratio) {
@@ -122,6 +123,7 @@ void MAARPacking::pack_rectangles_using_Best_Fit_strategy(
                 double midAspectRatio = getAspectRatio(R, mid);
 
                 if (midAspectRatio == aspect_ratio) { // Exact match! (unlikely)
+                    bestAspectRatio = midAspectRatio;
                     wrapWidth = mid;
                     break;
                 }
@@ -143,6 +145,7 @@ void MAARPacking::pack_rectangles_using_Best_Fit_strategy(
                     break;
 
                 if (agreement > bestAgreement) {
+                    bestAspectRatio = midAspectRatio;
                     bestAgreement = agreement;
                     wrapWidth = mid;
                 }

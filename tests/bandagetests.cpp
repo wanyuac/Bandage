@@ -27,6 +27,7 @@
 #include "../program/memory.h"
 #include "../graph/debruijnnode.h"
 #include "../graph/debruijnedge.h"
+#include "../blast/blastquerypath.h"
 #include "../program/globals.h"
 #include "../command_line/commoncommandlinefunctions.h"
 
@@ -43,6 +44,8 @@ private slots:
     void pathFunctionsOnGfaSequencesInGraph();
     void pathFunctionsOnGfaSequencesInFasta();
     void graphLocationFunctions();
+    void findAllPaths();
+    void findShortestPaths();
     void loadCsvData();
     void loadCsvDataTrinity();
     void blastSearch();
@@ -62,6 +65,19 @@ private slots:
 
 private:
     void createGlobals();
+    void runAllPathsDistanceSearch(QString path1String, QString path2String,
+                                   bool overlapOrientationSameStrand,
+                                   bool overlapOrientationOppositeStrand,
+                                   bool orientation1,
+                                   bool orientation2, bool orientation3,
+                                   bool orientation4, int pathSearchDepth,
+                                   int minDistance, int maxDistance);
+    void runShortestPathDistanceSearch(QString path1String, QString path2String,
+                                       bool overlapOrientationSameStrand,
+                                       bool overlapOrientationOppositeStrand,
+                                       bool orientation1,
+                                       bool orientation2, bool orientation3,
+                                       bool orientation4);
     bool createBlastTempDirectory();
     void deleteBlastTempDirectory();
     QString getTestDirectory();
@@ -191,10 +207,24 @@ void BandageTests::pathFunctionsOnFastg()
     QString pathStringFailure;
     Path testPath1 = Path::makeFromString("(50234) 6+, 26+, 23+, 26+, 24+ (200)", false, &pathStringFailure);
     Path testPath2 = Path::makeFromString("26+, 23+", true, &pathStringFailure);
+
     QCOMPARE(testPath1.getLength(), 1764);
     QCOMPARE(testPath2.getLength(), 1387);
     QCOMPARE(testPath1.isCircular(), false);
     QCOMPARE(testPath2.isCircular(), true);
+
+    DeBruijnNode * node6Plus = g_assemblyGraph->m_deBruijnGraphNodes["6+"];
+    DeBruijnNode * node23Plus = g_assemblyGraph->m_deBruijnGraphNodes["23+"];
+    DeBruijnNode * node24Plus = g_assemblyGraph->m_deBruijnGraphNodes["24+"];
+
+    QCOMPARE(testPath1.containsLocation(GraphLocation(node6Plus, 50233)), false);
+    QCOMPARE(testPath1.containsLocation(GraphLocation(node6Plus, 50234)), true);
+    QCOMPARE(testPath1.containsLocation(GraphLocation(node6Plus, 50235)), true);
+    QCOMPARE(testPath1.containsLocation(GraphLocation::startOfNode(node23Plus)), true);
+    QCOMPARE(testPath1.containsLocation(GraphLocation::endOfNode(node23Plus)), true);
+    QCOMPARE(testPath1.containsLocation(GraphLocation(node24Plus, 199)), true);
+    QCOMPARE(testPath1.containsLocation(GraphLocation(node24Plus, 200)), true);
+    QCOMPARE(testPath1.containsLocation(GraphLocation(node24Plus, 201)), false);
 }
 
 
@@ -326,6 +356,74 @@ void BandageTests::graphLocationFunctions()
 }
 
 
+void BandageTests::findAllPaths()
+{
+    createGlobals();
+    g_assemblyGraph->loadGraphFromFile(getTestDirectory() + "test.fastg");
+
+    //Test two overlapping paths.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(50000) 24- (50001)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    QueryDistance topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("overlap (same)"));
+
+    //Test two adjacent paths.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(50001) 24- (50002)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("1-> 2->"));
+    QCOMPARE(topResult.m_distancePath.getLength(), 0);
+
+    //Test two nearly adjacent paths.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(50002) 24- (50003)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("1-> 2->"));
+    QCOMPARE(topResult.m_distancePath.getLength(), 1);
+
+    //Test node search depth near a loop in the graph.  More search distance
+    //leads to more paths.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(10002) 6- (10100)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 0);
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(10002) 6- (10100)", true, true, true, true, true, true, 1, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 0);
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(10002) 6- (10100)", true, true, true, true, true, true, 2, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(10002) 6- (10100)", true, true, true, true, true, true, 3, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(10002) 6- (10100)", true, true, true, true, true, true, 4, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 2);
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(10002) 6- (10100)", true, true, true, true, true, true, 5, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 2);
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(10002) 6- (10100)", true, true, true, true, true, true, 6, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 3);
+
+    //Test two overlapping paths on opposite strands.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(2214) 24+ (12214)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("overlap (opposite)"));
+
+    //Test two overlapping paths on opposite strands.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(12214) 24+ (22214)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("overlap (opposite)"));
+
+    //Test two adjacent paths on opposite strands.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(12215) 24+ (22215)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("<-1 2->"));
+    QCOMPARE(topResult.m_distancePath.getLength(), 0);
+
+    //Test two paths on opposite strands with a distance of 1.
+    runAllPathsDistanceSearch("(40000) 24- (50000)", "(12216) 24+ (22216)", true, true, true, true, true, true, 0, 0, 1000000);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("<-1 2->"));
+    QCOMPARE(topResult.m_distancePath.getLength(), 1);
+}
 
 void BandageTests::loadCsvData()
 {
@@ -511,6 +609,45 @@ void BandageTests::blastSearchFilters()
 }
 
 
+void BandageTests::findShortestPaths()
+{
+    createGlobals();
+    g_assemblyGraph->loadGraphFromFile(getTestDirectory() + "test2.fastg");
+
+    runShortestPathDistanceSearch("1+ (300)", "(301) 7+", true, true, true, true, true, true);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    QueryDistance topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_orientation, QString("1-> 2->"));
+    QCOMPARE(topResult.m_distancePath.getNodeCount(), 6);
+
+    runShortestPathDistanceSearch("1+ (300)", "(301) 7+", true, true, false, true, true, true);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 0);
+
+    runShortestPathDistanceSearch("(100) 8+ (199)", "(402) 8+ (501)", true, true, true, true, true, true);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_distancePath.getLength(), 198);
+
+    runShortestPathDistanceSearch("(102) 8+ (201)", "(400) 8+ (499)", true, true, true, true, true, true);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_distancePath.getLength(), 198);
+
+    runShortestPathDistanceSearch("(101) 8+ (200)", "(401) 8+ (500)", false, false, true, false, false, false);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_distancePath.getLength(), 200);
+    QCOMPARE(topResult.m_orientation, QString("1-> 2->"));
+
+    runShortestPathDistanceSearch("(101) 8+ (200)", "(401) 8+ (500)", false, false, false, true, false, false);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 1);
+    topResult = g_memory->distanceSearchResults[0];
+    QCOMPARE(topResult.m_distancePath.getLength(), 200);
+    QCOMPARE(topResult.m_orientation, QString("2-> 1->"));
+
+    runShortestPathDistanceSearch("1+ (300)", "(101) 8+ (200)", true, true, true, true, true, true);
+    QCOMPARE(g_memory->distanceSearchResults.size(), 0);
+}
 
 void BandageTests::graphScope()
 {
@@ -1504,6 +1641,64 @@ void BandageTests::createGlobals()
     g_graphicsView = new MyGraphicsView();
 }
 
+void BandageTests::runAllPathsDistanceSearch(QString path1String, QString path2String,
+                               bool overlapOrientationSameStrand,
+                               bool overlapOrientationOppositeStrand,
+                               bool orientation1,
+                               bool orientation2, bool orientation3,
+                               bool orientation4, int pathSearchDepth,
+                               int minDistance, int maxDistance)
+{
+    QString pathStringFailure;
+    Path path1 = Path::makeFromString(path1String, false, &pathStringFailure);
+    Path path2 = Path::makeFromString(path2String, false, &pathStringFailure);
+
+    BlastQuery query1("query1", path1.getPathSequence());
+    BlastQuery query2("query2", path2.getPathSequence());
+    BlastQueryPath blastQueryPath1(path1, &query1);
+    BlastQueryPath blastQueryPath2(path2, &query2);
+
+    QList<BlastQueryPath> list1;
+    QList<BlastQueryPath> list2;
+    list1.push_back(blastQueryPath1);
+    list2.push_back(blastQueryPath2);
+
+    g_assemblyGraph->findAllPaths(list1, list2,
+                                  overlapOrientationSameStrand,
+                                  overlapOrientationOppositeStrand,
+                                  orientation1, orientation2, orientation3,
+                                  orientation4, pathSearchDepth,
+                                  minDistance, maxDistance);
+}
+
+void BandageTests::runShortestPathDistanceSearch(QString path1String, QString path2String,
+                                   bool overlapOrientationSameStrand,
+                                   bool overlapOrientationOppositeStrand,
+                                   bool orientation1,
+                                   bool orientation2, bool orientation3,
+                                   bool orientation4)
+{
+    QString pathStringFailure;
+    Path path1 = Path::makeFromString(path1String, false, &pathStringFailure);
+    Path path2 = Path::makeFromString(path2String, false, &pathStringFailure);
+
+    BlastQuery query1("query1", path1.getPathSequence());
+    BlastQuery query2("query2", path2.getPathSequence());
+    BlastQueryPath blastQueryPath1(path1, &query1);
+    BlastQueryPath blastQueryPath2(path2, &query2);
+
+    QList<BlastQueryPath> list1;
+    QList<BlastQueryPath> list2;
+    list1.push_back(blastQueryPath1);
+    list2.push_back(blastQueryPath2);
+
+    g_assemblyGraph->findShortestPaths(list1, list2,
+                                       overlapOrientationSameStrand,
+                                       overlapOrientationOppositeStrand,
+                                       orientation1, orientation2, orientation3,
+                                       orientation4);
+}
+
 bool BandageTests::createBlastTempDirectory()
 {
     //Running from the command line, it makes more sense to put the temp
@@ -1582,7 +1777,6 @@ bool BandageTests::doCircularSequencesMatch(QByteArray s1, QByteArray s2)
 
     return false;
 }
-
 
 
 QTEST_MAIN(BandageTests)

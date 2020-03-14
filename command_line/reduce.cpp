@@ -1,4 +1,4 @@
-//Copyright 2017 Ryan Wick
+//Copyright 2016 Ryan Wick
 
 //This file is part of Bandage
 
@@ -122,7 +122,6 @@ int bandageReduce(QStringList arguments)
         return 1;
     }
 
-    deleteBlastTempDirectory();
     return 0;
 }
 
